@@ -1,4 +1,4 @@
-name: Deploy Email Service
+name: Deploy Email
 
 on:
   push:
@@ -21,10 +21,10 @@ jobs:
           password: ${{ secrets.DOCKER_PASS }}
 
       - name: Build & Push Docker Image
+        env:
+          IMAGE_NAME: chibueze15950/email-service
+          COMMIT_SHA: ${{ github.sha }}
         run: |
-          IMAGE_NAME=${{ secrets.DOCKER_USER }}/email-service
-          COMMIT_SHA=${{ github.sha }}
-
           echo "Building Docker images for $IMAGE_NAME"
           docker build -t $IMAGE_NAME:latest -t $IMAGE_NAME:$COMMIT_SHA .
 
