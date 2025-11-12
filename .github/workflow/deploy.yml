@@ -22,7 +22,7 @@ jobs:
 
       - name: Build & Push Docker Image
         run: |
-          IMAGE_NAME=${{ secrets.DOCKER_USER }}/email-robot:latest
+          IMAGE_NAME=${{ secrets.DOCKER_USER }}/email-service:latest
           echo "Building Docker image $IMAGE_NAME"
           docker build -t $IMAGE_NAME .
           echo "Pushing Docker image $IMAGE_NAME"
