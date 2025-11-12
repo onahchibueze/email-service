@@ -1,4 +1,4 @@
-name: Deploy Email
+name: Deploy Email Service
 
 on:
   push:
@@ -22,8 +22,12 @@ jobs:
 
       - name: Build & Push Docker Image
         run: |
-          IMAGE_NAME=${{ secrets.DOCKER_USER }}/email-service:latest
-          echo "Building Docker image $IMAGE_NAME"
-          docker build -t $IMAGE_NAME .
-          echo "Pushing Docker image $IMAGE_NAME"
-          docker push $IMAGE_NAME
+          IMAGE_NAME=${{ secrets.DOCKER_USER }}/email-service
+          COMMIT_SHA=${{ github.sha }}
+
+          echo "Building Docker images for $IMAGE_NAME"
+          docker build -t $IMAGE_NAME:latest -t $IMAGE_NAME:$COMMIT_SHA .
+
+          echo "Pushing Docker images to Docker Hub"
+          docker push $IMAGE_NAME:latest
+          docker push $IMAGE_NAME:$COMMIT_SHA
