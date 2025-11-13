@@ -1,8 +1,6 @@
 import Fastify from "fastify";
 import { startConsumer } from "./consumer.js";
 import dotenv from "dotenv";
-
-// Add etcd import
 import { Etcd3 } from 'etcd3';
 
 dotenv.config();
@@ -14,11 +12,16 @@ const etcdClient = new Etcd3({
   hosts: [process.env.ETCD_URL?.replace('http://', '') || 'etcd:2379'],
 });
 
+let leaseInstance = null;
+
 // Service registration function
 const registerWithEtcd = async () => {
   try {
-    const lease = etcdClient.lease(30);
-    const leaseId = await lease.grant();
+    // Create a lease with 30 second TTL
+    leaseInstance = etcdClient.lease(30);
+    
+    // Grant the lease and get the ID
+    await leaseInstance.grant();
     
     const serviceData = {
       name: 'email-service',
@@ -28,30 +31,37 @@ const registerWithEtcd = async () => {
       registeredAt: new Date().toISOString()
     };
     
-    await etcdClient.put('/services/email-service/email-service-001')
-      .value(JSON.stringify(serviceData))
-      .lease(leaseId);
+    // Register service with the lease
+    await leaseInstance
+      .put('/services/email-service/email-service-001')
+      .value(JSON.stringify(serviceData));
       
     console.log('✅ Email service registered with etcd');
     
-    // Keep lease alive
-    setInterval(async () => {
-      try {
-        await lease.refresh();
-      } catch (err) {
-        console.error('Failed to refresh etcd lease:', err);
-      }
-    }, 15000); // Refresh every 15 seconds
+    // Set up keep-alive for the lease
+    // This keeps the lease alive automatically
+    leaseInstance.on('lost', () => {
+      console.error('⚠️ Lease lost! Attempting to re-register...');
+      // Attempt to re-register
+      setTimeout(() => registerWithEtcd(), 5000);
+    });
     
   } catch (error) {
     console.error('❌ Failed to register email service with etcd:', error);
+    // Retry registration after 5 seconds
+    setTimeout(() => registerWithEtcd(), 5000);
   }
 };
 
 // Deregistration function
 const deregisterFromEtcd = async () => {
   try {
-    await etcdClient.delete('/services/email-service/email-service-001');
+    // Revoke the lease (this will delete all keys associated with it)
+    if (leaseInstance) {
+      await leaseInstance.revoke();
+    }
+    // Also explicitly delete the key
+    await etcdClient.delete().key('/services/email-service/email-service-001');
     console.log('✅ Email service deregistered from etcd');
   } catch (error) {
     console.error('❌ Failed to deregister email service from etcd:', error);
@@ -112,6 +122,13 @@ const start = async () => {
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('Received SIGTERM, shutting down gracefully...');
+  await deregisterFromEtcd();
+  await etcdClient.close();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('Received SIGINT, shutting down gracefully...');
   await deregisterFromEtcd();
   await etcdClient.close();
   process.exit(0);
