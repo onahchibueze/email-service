@@ -13,6 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "@sendgrid/mail": "^8.1.6",
+    "etcd3": "^1.1.0",
     "amqplib": "^0.10.9",
     "dotenv": "^17.2.3",
     "fastify": "^5.6.2",
